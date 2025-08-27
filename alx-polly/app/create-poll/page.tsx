@@ -5,9 +5,11 @@ import Button from "../../components/shadcn/Button";
 import { addPoll } from "../../lib/storage";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "../../components/ProtectedRoute";
+import { useAuth } from "../../components/AuthProvider";
 
 export default function CreatePollPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("basic");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -36,6 +38,8 @@ export default function CreatePollPage() {
       description: description.trim() || undefined,
       options: trimmed,
       votes: 0,
+      authorId: user?.id,
+      authorName: user?.username || user?.email || "Anonymous",
       settings: {
         allowMultiple,
         requireLogin,

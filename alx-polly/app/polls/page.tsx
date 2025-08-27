@@ -3,14 +3,17 @@ import React, { useEffect, useState } from "react";
 import Button from "../../components/shadcn/Button";
 import { getPolls, type StoredPoll } from "../../lib/storage";
 import { useRouter } from "next/navigation";
+import { useAuth } from "../../components/AuthProvider";
 
 export default function PollsDashboard() {
   const [polls, setPolls] = useState<StoredPoll[]>([]);
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
-    setPolls(getPolls());
-  }, []);
+    const all = getPolls();
+    setPolls(user ? all.filter(p => p.authorId === user.id) : all);
+  }, [user]);
 
   return (
     <main className="w-full py-10 px-8">
@@ -23,6 +26,9 @@ export default function PollsDashboard() {
           Create a New Poll
         </Button>
       </div>
+      {!user && (
+        <div className="mb-4 text-sm text-gray-600">Login to see and manage your polls.</div>
+      )}
       {polls.length === 0 ? (
         <div className="text-gray-500">No polls yet. Create your first poll.</div>
       ) : (
