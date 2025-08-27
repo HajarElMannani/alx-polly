@@ -100,7 +100,7 @@ App runs at http://localhost:3000
 
 ## App Structure (important routes)
 
-- `/` → redirects to `/polls`
+- `/` → Landing page (hero + CTAs)
 - `/polls` → dashboard (shows current user's polls if logged in)
 - `/create-poll` → create a poll (protected)
 - `/polls/[id]` → vote page (public), optional login required based on poll setting
@@ -117,9 +117,8 @@ This demo uses localStorage as a backend stub for polls:
 - Voting prevention uses both localStorage and the authenticated user id.
 - For production, replace `lib/storage.ts` with real API/database calls.
 
-## Known Limitations
+## Further improvements
 
 - Editing options resets vote counts if the number of options changes.
 - Duplicate-vote prevention is best-effort on the client.
 - QR is generated via a public image API for convenience.
-
