@@ -17,6 +17,7 @@ type PollRow = {
 export default function PollsDashboard() {
   const [polls, setPolls] = useState<PollRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sharePollId, setSharePollId] = useState<string | null>(null);
   const router = useRouter();
   const { user } = useAuth();
 
@@ -40,14 +41,28 @@ export default function PollsDashboard() {
     fetchPolls();
   }, [user]);
 
+  // If not logged in, show a login prompt card
+  if (!user) {
+    return (
+      <main className="w-full py-16 px-8">
+        <div className="max-w-xl mx-auto bg-white border rounded-xl shadow p-8 text-center">
+          <h1 className="text-2xl font-bold mb-2">Your Polls</h1>
+          <p className="text-gray-600 mb-6">Log in to create polls and view the ones you have created.</p>
+          <div className="flex items-center justify-center gap-3">
+            <a href="/login" className="inline-flex rounded-md px-4 py-2 text-white bg-blue-600 hover:bg-blue-700">Login</a>
+            <a href="/register" className="inline-flex rounded-md px-4 py-2 border hover:bg-gray-50">Register</a>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const shareUrl = (id: string) => {
     if (typeof window === "undefined") return "";
     return `${window.location.origin}/polls/${id}`;
   };
 
   const qrUrl = (id: string) => `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl(id))}`;
-
-  const [sharePollId, setSharePollId] = useState<string | null>(null);
 
   const copyLink = async (id: string) => {
     try {
@@ -67,9 +82,6 @@ export default function PollsDashboard() {
           Create a New Poll
         </Button>
       </div>
-      {!user && (
-        <div className="mb-4 text-sm text-gray-600">Login to see and manage your polls.</div>
-      )}
       {loading ? (
         <div className="text-gray-500">Loading...</div>
       ) : polls.length === 0 ? (

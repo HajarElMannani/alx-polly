@@ -16,6 +16,7 @@ export default function CreatePollPage() {
   const [options, setOptions] = useState(["", ""]);
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [requireLogin, setRequireLogin] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,10 +39,7 @@ export default function CreatePollPage() {
     setSubmitting(true);
     const supabase = supabaseBrowser();
     try {
-      // Ensure profile row exists for FK
       await supabase!.from("profiles").upsert({ id: user.id, username: user.username || user.email || "anonymous" });
-
-      // Insert poll
       const { data: pollRow, error: pollErr } = await supabase!
         .from("polls")
         .insert({
@@ -50,17 +48,15 @@ export default function CreatePollPage() {
           description: description.trim() || null,
           allow_multiple: allowMultiple,
           require_login: requireLogin,
+          is_public: isPublic,
           ends_at: endDate ? new Date(endDate).toISOString() : null,
         })
         .select("id")
         .single();
       if (pollErr || !pollRow) throw pollErr || new Error("Failed to create poll");
-
-      // Insert options
       const optionRows = trimmed.map((label, index) => ({ poll_id: pollRow.id, label, position: index }));
       const { error: optErr } = await supabase!.from("poll_options").insert(optionRows);
       if (optErr) throw optErr;
-
       router.push(`/polls/${pollRow.id}`);
     } catch (err: any) {
       alert(err?.message || "Something went wrong while creating the poll");
@@ -141,6 +137,15 @@ export default function CreatePollPage() {
                         onChange={(e) => setRequireLogin(e.target.checked)}
                       />
                       <span>Require users to be logged in to vote</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={isPublic}
+                        onChange={(e) => setIsPublic(e.target.checked)}
+                      />
+                      <span>List this poll on Explore (public)</span>
                     </label>
                     <Input
                       label="Poll End Date (optional)"
