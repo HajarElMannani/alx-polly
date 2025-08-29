@@ -2,38 +2,76 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Button from "../../../components/shadcn/Button";
-import { getPollById, deletePoll, recordVote, hasVotedBrowser, setVotedBrowser, type StoredPoll } from "../../../lib/storage";
 import { useAuth } from "../../../components/AuthProvider";
+import { supabaseBrowser } from "../../../lib/supabaseClient";
+
+type OptionRow = { id: string; label: string; position: number; vote_count: number };
+
+type PollRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  require_login: boolean;
+  created_at: string;
+  author_id: string;
+};
 
 export default function VotePage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const pollId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
-  const [poll, setPoll] = useState<StoredPoll | null>(null);
+  const [poll, setPoll] = useState<PollRow | null>(null);
+  const [options, setOptions] = useState<OptionRow[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [alreadyVoted, setAlreadyVoted] = useState(false);
+
+  const isAuthor = useMemo(() => !!(user?.id && poll?.author_id === user.id), [user, poll]);
 
   useEffect(() => {
-    if (!pollId) return;
-    const p = getPollById(pollId);
-    if (!p) {
-      router.replace("/polls");
-      return;
-    }
-    setPoll(p);
-  }, [pollId, router]);
-
-  const alreadyVoted = useMemo(() => {
-    if (!poll) return false;
-    if (hasVotedBrowser(poll.id)) return true;
-    if (user?.id && poll.voters?.includes(user.id)) return true;
-    return false;
-  }, [poll, user]);
+    const fetchData = async () => {
+      const supabase = supabaseBrowser();
+      if (!supabase || !pollId) return;
+      // Poll
+      const { data: p } = await supabase
+        .from("polls")
+        .select("id,title,description,require_login,created_at,author_id")
+        .eq("id", pollId)
+        .single();
+      if (!p) {
+        router.replace("/polls");
+        return;
+      }
+      setPoll(p as PollRow);
+      // Options with vote counts
+      const { data: opts } = await supabase
+        .from("poll_options")
+        .select("id,label,position, votes:votes(count)")
+        .eq("poll_id", pollId)
+        .order("position", { ascending: true });
+      const normalized = (opts || []).map((o: any) => ({ id: o.id, label: o.label, position: o.position, vote_count: o.votes?.[0]?.count ?? 0 }));
+      setOptions(normalized);
+      // Check if current user has voted
+      if (user?.id) {
+        const { data: v } = await supabase
+          .from("votes")
+          .select("id")
+          .eq("poll_id", pollId)
+          .eq("voter_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        setAlreadyVoted(!!v);
+      }
+    };
+    fetchData();
+  }, [pollId, user, router]);
 
   if (!poll) return null;
 
-  const submitVote = () => {
-    if (poll.settings?.requireLogin && !user) {
+  const submitVote = async () => {
+    const supabase = supabaseBrowser();
+    if (!supabase) return;
+    if (poll.require_login && !user) {
       router.push("/login");
       return;
     }
@@ -45,33 +83,30 @@ export default function VotePage() {
       alert("Please select an option.");
       return;
     }
-    const updated = recordVote(poll.id, selectedIndex, user?.id);
-    if (updated) {
-      setVotedBrowser(poll.id);
-      router.push(`/polls/${poll.id}/results`);
+    const option = options[selectedIndex];
+    const { error } = await supabase.from("votes").insert({ poll_id: poll.id, option_id: option.id, voter_id: user?.id ?? null });
+    if (error) {
+      alert(error.message);
+      return;
     }
+    router.push(`/polls/${poll.id}/results`);
   };
 
-  const isAuthor = user?.id && poll.authorId === user.id;
-
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!isAuthor) return;
-    if (confirm("Are you sure you want to delete this poll?")) {
-      deletePoll(poll.id);
-      router.push("/polls");
+    if (!confirm("Are you sure you want to delete this poll?")) return;
+    const supabase = supabaseBrowser();
+    if (!supabase) return;
+    const { error } = await supabase.from("polls").delete().eq("id", poll.id);
+    if (error) {
+      alert(error.message);
+      return;
     }
+    router.push("/polls");
   };
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      alert("Link copied to clipboard");
-    } catch {
-      /* no-op */
-    }
-  };
 
   return (
     <main className="min-h-screen py-10 px-4">
@@ -80,14 +115,12 @@ export default function VotePage() {
           <span aria-hidden>←</span>
           <span>Back to Polls</span>
         </a>
-        <div className="flex items-center gap-2">
-          {isAuthor && (
-            <>
-              <a href={`/polls/${poll.id}/edit`} className="inline-flex items-center px-3 py-2 border border-black text-black hover:bg-gray-100 rounded-md">Edit Poll</a>
-              <Button className="bg-red-600 text-white hover:opacity-90" onClick={handleDelete}>Delete</Button>
-            </>
-          )}
-        </div>
+        {isAuthor && (
+          <div className="flex items-center gap-2">
+            <a href={`/polls/${poll.id}/edit`} className="inline-flex items-center px-3 py-2 border border-black text-black hover:bg-gray-100 rounded-md">Edit Poll</a>
+            <Button className="bg-red-600 text-white hover:opacity-90" onClick={handleDelete}>Delete</Button>
+          </div>
+        )}
       </div>
       <div className="w-full max-w-xl mx-auto bg-white rounded-lg shadow p-8">
         <h1 className="text-2xl font-bold">{poll.title}</h1>
@@ -95,9 +128,9 @@ export default function VotePage() {
           <p className="text-gray-600 mt-1">{poll.description}</p>
         )}
         <div className="mt-6 flex flex-col gap-3">
-          {poll.options.map((opt, idx) => (
+          {options.map((opt, idx) => (
             <label
-              key={idx}
+              key={opt.id}
               className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-colors ${
                 selectedIndex === idx ? "border-black bg-gray-200 font-medium" : "hover:bg-gray-50"
               }`}
@@ -110,20 +143,17 @@ export default function VotePage() {
                 checked={selectedIndex === idx}
                 onChange={() => setSelectedIndex(idx)}
               />
-              <span>{opt}</span>
+              <span>{opt.label}</span>
             </label>
           ))}
         </div>
         <Button className="mt-6 bg-black text-white" onClick={submitVote}>Submit Vote</Button>
         <div className="mt-6 text-xs text-gray-500">
-          <span>Created by {poll.authorName ?? "Anonymous"}</span>
-          <span className="mx-2">•</span>
-          <span>Created on {new Date(poll.createdAt).toLocaleDateString()}</span>
+          <span>Created on {new Date(poll.created_at).toLocaleDateString()}</span>
         </div>
         <div className="mt-6 flex items-center justify-between gap-4">
           <div className="text-sm text-gray-600 break-all">
             Share link: <a className="text-blue-600 hover:underline" href={shareUrl}>{shareUrl}</a>
-            <button onClick={copyLink} className="ml-2 text-blue-600 hover:underline">Copy</button>
           </div>
           <img src={qrUrl} alt="QR Code" className="w-20 h-20" />
         </div>

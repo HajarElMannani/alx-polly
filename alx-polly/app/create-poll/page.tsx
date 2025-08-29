@@ -2,10 +2,10 @@
 import React, { useState } from "react";
 import Input from "../../components/shadcn/Input";
 import Button from "../../components/shadcn/Button";
-import { addPoll } from "../../lib/storage";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { useAuth } from "../../components/AuthProvider";
+import { supabaseBrowser } from "../../lib/supabaseClient";
 
 export default function CreatePollPage() {
   const router = useRouter();
@@ -17,6 +17,7 @@ export default function CreatePollPage() {
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [requireLogin, setRequireLogin] = useState(false);
   const [endDate, setEndDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleOptionChange = (idx: number, value: string) => {
     setOptions((opts) => opts.map((opt, i) => (i === idx ? value : opt)));
@@ -26,27 +27,46 @@ export default function CreatePollPage() {
     setOptions((opts) => [...opts, ""]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     const trimmed = options.map(o => o.trim()).filter(Boolean);
     if (!title.trim() || trimmed.length < 2) {
       alert("Please enter a title and at least two options.");
       return;
     }
-    addPoll({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      options: trimmed,
-      votes: 0,
-      authorId: user?.id,
-      authorName: user?.username || user?.email || "Anonymous",
-      settings: {
-        allowMultiple,
-        requireLogin,
-        endDate: endDate || undefined,
-      },
-    });
-    router.push("/polls");
+    setSubmitting(true);
+    const supabase = supabaseBrowser();
+    try {
+      // Ensure profile row exists for FK
+      await supabase!.from("profiles").upsert({ id: user.id, username: user.username || user.email || "anonymous" });
+
+      // Insert poll
+      const { data: pollRow, error: pollErr } = await supabase!
+        .from("polls")
+        .insert({
+          author_id: user.id,
+          title: title.trim(),
+          description: description.trim() || null,
+          allow_multiple: allowMultiple,
+          require_login: requireLogin,
+          ends_at: endDate ? new Date(endDate).toISOString() : null,
+        })
+        .select("id")
+        .single();
+      if (pollErr || !pollRow) throw pollErr || new Error("Failed to create poll");
+
+      // Insert options
+      const optionRows = trimmed.map((label, index) => ({ poll_id: pollRow.id, label, position: index }));
+      const { error: optErr } = await supabase!.from("poll_options").insert(optionRows);
+      if (optErr) throw optErr;
+
+      router.push(`/polls/${pollRow.id}`);
+    } catch (err: any) {
+      alert(err?.message || "Something went wrong while creating the poll");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -132,7 +152,9 @@ export default function CreatePollPage() {
                 </div>
               )}
             </div>
-            <Button type="submit" className="mt-6 self-end bg-black text-white">Create Poll</Button>
+            <Button type="submit" className="mt-6 self-end bg-black text-white" disabled={submitting}>
+              {submitting ? "Creating..." : "Create Poll"}
+            </Button>
           </form>
         </div>
       </main>

@@ -1,19 +1,43 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Button from "../../components/shadcn/Button";
-import { getPolls, type StoredPoll } from "../../lib/storage";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
+import { supabaseBrowser } from "../../lib/supabaseClient";
+
+type PollRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  poll_options: { count: number }[];
+  votes: { count: number }[];
+};
 
 export default function PollsDashboard() {
-  const [polls, setPolls] = useState<StoredPoll[]>([]);
-  const [sharePollId, setSharePollId] = useState<string | null>(null);
+  const [polls, setPolls] = useState<PollRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { user } = useAuth();
 
   useEffect(() => {
-    const all = getPolls();
-    setPolls(user ? all.filter(p => p.authorId === user.id) : all);
+    const fetchPolls = async () => {
+      setLoading(true);
+      const supabase = supabaseBrowser();
+      if (!supabase || !user) {
+        setPolls([]);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("polls")
+        .select("id,title,description,created_at,poll_options(count),votes(count)")
+        .eq("author_id", user.id)
+        .order("created_at", { ascending: false });
+      if (!error && data) setPolls(data as unknown as PollRow[]);
+      setLoading(false);
+    };
+    fetchPolls();
   }, [user]);
 
   const shareUrl = (id: string) => {
@@ -22,6 +46,8 @@ export default function PollsDashboard() {
   };
 
   const qrUrl = (id: string) => `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl(id))}`;
+
+  const [sharePollId, setSharePollId] = useState<string | null>(null);
 
   const copyLink = async (id: string) => {
     try {
@@ -44,7 +70,9 @@ export default function PollsDashboard() {
       {!user && (
         <div className="mb-4 text-sm text-gray-600">Login to see and manage your polls.</div>
       )}
-      {polls.length === 0 ? (
+      {loading ? (
+        <div className="text-gray-500">Loading...</div>
+      ) : polls.length === 0 ? (
         <div className="text-gray-500">No polls yet. Create your first poll.</div>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -59,11 +87,11 @@ export default function PollsDashboard() {
                 <p className="text-gray-700 text-xs">{poll.description}</p>
               )}
               <div className="flex gap-2 text-xs text-gray-500">
-                <span>{poll.options.length} options</span>
-                <span>{poll.votes ?? 0} total votes</span>
+                <span>{poll.poll_options?.[0]?.count ?? 0} options</span>
+                <span>{poll.votes?.[0]?.count ?? 0} total votes</span>
               </div>
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-400">Created on {new Date(poll.createdAt).toLocaleDateString()}</div>
+                <div className="text-xs text-gray-400">Created on {new Date(poll.created_at).toLocaleDateString()}</div>
                 <button
                   className="text-blue-600 hover:underline text-xs"
                   onClick={(e) => { e.stopPropagation(); setSharePollId(poll.id); }}

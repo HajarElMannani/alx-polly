@@ -1,70 +1,103 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Input from "../../../../components/shadcn/Input";
 import Button from "../../../../components/shadcn/Button";
-import { getPollById, updatePoll, type StoredPoll } from "../../../../lib/storage";
 import { useAuth } from "../../../../components/AuthProvider";
+import { supabaseBrowser } from "../../../../lib/supabaseClient";
+
+type PollRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  author_id: string;
+};
+
+type OptionRow = { id: string; label: string; position: number };
 
 export default function EditPollPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const pollId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
-  const [poll, setPoll] = useState<StoredPoll | null>(null);
+  const [poll, setPoll] = useState<PollRow | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [options, setOptions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const isAuthor = useMemo(() => !!(user?.id && poll?.author_id === user.id), [user, poll]);
 
   useEffect(() => {
-    if (!pollId) return;
-    const p = getPollById(pollId);
-    if (!p) {
-      router.replace("/polls");
-      return;
-    }
-    setPoll(p);
-    setTitle(p.title);
-    setDescription(p.description ?? "");
-    setOptions(p.options);
+    const load = async () => {
+      const supabase = supabaseBrowser();
+      if (!supabase || !pollId) return;
+      const { data: p } = await supabase
+        .from("polls")
+        .select("id,title,description,author_id")
+        .eq("id", pollId)
+        .single();
+      if (!p) {
+        router.replace("/polls");
+        return;
+      }
+      setPoll(p as PollRow);
+      setTitle((p as PollRow).title);
+      setDescription(((p as PollRow).description ?? "") as string);
+      const { data: opts } = await supabase
+        .from("poll_options")
+        .select("id,label,position")
+        .eq("poll_id", pollId)
+        .order("position", { ascending: true });
+      setOptions((opts || []).map((o: any) => o.label as string));
+    };
+    load();
   }, [pollId, router]);
 
-  const isAuthor = user?.id && poll?.authorId === user.id;
+  useEffect(() => {
+    // If poll loaded and user not author, redirect to poll page
+    if (poll && user && poll.author_id !== user.id) {
+      router.replace(`/polls/${poll.id}`);
+    }
+  }, [poll, user, router]);
 
   const addOption = () => setOptions(o => [...o, ""]);
   const removeOption = (idx: number) => setOptions(o => o.filter((_, i) => i !== idx));
-  const changeOption = (idx: number, value: string) => setOptions(o => o.map((v, i) => i === idx ? value : v));
+  const changeOption = (idx: number, value: string) => setOptions(o => o.map((v, i) => (i === idx ? value : v)));
 
-  const save = (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!poll || !isAuthor) return;
     setError(null);
     setMessage(null);
-    if (!isAuthor) {
-      setError("Only the author can edit this poll.");
-      return;
-    }
     const trimmed = options.map(o => o.trim()).filter(Boolean);
     if (!title.trim() || trimmed.length < 2) {
       setError("Provide a title and at least two options.");
       return;
     }
-    const updated = updatePoll(pollId, (p) => {
-      const next = { ...p };
-      next.title = title.trim();
-      next.description = description.trim() || undefined;
-      // If options changed length, reset optionVotes to match new length
-      if (trimmed.length !== next.options.length) {
-        next.optionVotes = new Array(trimmed.length).fill(0);
-        next.votes = 0;
-      }
-      next.options = trimmed;
-      return next;
-    });
-    if (updated) {
+    setSaving(true);
+    const supabase = supabaseBrowser();
+    try {
+      // Update poll
+      const { error: upErr } = await supabase!.from("polls").update({
+        title: title.trim(),
+        description: description.trim() || null,
+      }).eq("id", poll.id);
+      if (upErr) throw upErr;
+      // Replace options: delete then insert
+      const { error: delErr } = await supabase!.from("poll_options").delete().eq("poll_id", poll.id);
+      if (delErr) throw delErr;
+      const optionRows = trimmed.map((label, index) => ({ poll_id: poll.id, label, position: index }));
+      const { error: insErr } = await supabase!.from("poll_options").insert(optionRows);
+      if (insErr) throw insErr;
       setMessage("Poll updated.");
-      router.push(`/polls/${pollId}`);
+      router.push(`/polls/${poll.id}`);
+    } catch (err: any) {
+      setError(err?.message || "Failed to update poll");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -92,8 +125,8 @@ export default function EditPollPage() {
             <Button type="button" variant="ghost" className="mt-2 w-fit" onClick={addOption}>+ Add option</Button>
           </div>
           <div className="flex justify-end gap-2">
-            <a href={`/polls/${pollId}`} className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm">Cancel</a>
-            <Button type="submit" className="bg-black text-white">Save</Button>
+            <a href={`/polls/${poll.id}`} className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm">Cancel</a>
+            <Button type="submit" className="bg-black text-white" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
           </div>
         </form>
       </div>

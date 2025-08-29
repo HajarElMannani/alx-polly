@@ -1,25 +1,44 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { getPollById, type StoredPoll } from "../../../../lib/storage";
+import { supabaseBrowser } from "../../../../lib/supabaseClient";
+
+type PollRow = { id: string; title: string };
+
+type OptionRow = { id: string; label: string; vote_count: number };
 
 export default function ResultsPage() {
   const params = useParams();
   const pollId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
-  const [poll, setPoll] = useState<StoredPoll | null>(null);
+  const [poll, setPoll] = useState<PollRow | null>(null);
+  const [options, setOptions] = useState<OptionRow[]>([]);
 
   useEffect(() => {
-    if (!pollId) return;
-    const p = getPollById(pollId);
-    if (p) setPoll(p);
+    const fetchData = async () => {
+      const supabase = supabaseBrowser();
+      if (!supabase || !pollId) return;
+      const { data: p } = await supabase
+        .from("polls")
+        .select("id,title")
+        .eq("id", pollId)
+        .single();
+      if (p) setPoll(p as PollRow);
+      const { data: opts } = await supabase
+        .from("poll_options")
+        .select("id,label, votes:votes(count)")
+        .eq("poll_id", pollId)
+        .order("position", { ascending: true });
+      const normalized = (opts || []).map((o: any) => ({ id: o.id, label: o.label, vote_count: o.votes?.[0]?.count ?? 0 }));
+      setOptions(normalized);
+    };
+    fetchData();
   }, [pollId]);
 
   const totals = useMemo(() => {
-    if (!poll) return { total: 0, percents: [] as number[] };
-    const total = (poll.optionVotes ?? []).reduce((a, b) => a + b, 0);
-    const percents = (poll.optionVotes ?? []).map(v => (total === 0 ? 0 : Math.round((v * 100) / total)));
+    const total = options.reduce((a, b) => a + (b.vote_count || 0), 0);
+    const percents = options.map(o => (total === 0 ? 0 : Math.round((o.vote_count * 100) / total)));
     return { total, percents };
-  }, [poll]);
+  }, [options]);
 
   if (!poll) return null;
 
@@ -32,17 +51,14 @@ export default function ResultsPage() {
         <h1 className="text-2xl font-bold">Results: {poll.title}</h1>
         <div className="mt-4 text-sm text-gray-600">Total votes: {totals.total}</div>
         <div className="mt-6 space-y-3">
-          {poll.options.map((opt, idx) => (
-            <div key={idx}>
+          {options.map((opt, idx) => (
+            <div key={opt.id}>
               <div className="flex justify-between text-sm">
-                <span>{opt}</span>
-                <span>{poll.optionVotes?.[idx] ?? 0} ({totals.percents[idx] ?? 0}%)</span>
+                <span>{opt.label}</span>
+                <span>{opt.vote_count} ({totals.percents[idx] ?? 0}%)</span>
               </div>
               <div className="w-full h-2 bg-gray-200 rounded">
-                <div
-                  className="h-2 bg-black rounded"
-                  style={{ width: `${totals.percents[idx] ?? 0}%` }}
-                />
+                <div className="h-2 bg-black rounded" style={{ width: `${totals.percents[idx] ?? 0}%` }} />
               </div>
             </div>
           ))}
