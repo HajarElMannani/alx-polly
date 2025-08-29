@@ -12,7 +12,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     await signOut();
     setDropdownOpen(false);
-    window.location.replace("/login");
+    window.location.replace("/");
   };
 
   return (
@@ -22,7 +22,7 @@ export default function Navbar() {
       {/* Centered Links */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-8">
         <a href="/explore" className="hover:underline">Explore</a>
-        <a href="/polls" className="hover:underline">My Polls</a>
+        <button className="hover:underline" onClick={(e) => { e.preventDefault(); if (!user) { alert("Please log in to see your polls."); return; } router.push("/polls"); }}>My Polls</button>
         <a href="/create-poll" className="hover:underline">Create Poll</a>
       </div>
       {/* Right */}
