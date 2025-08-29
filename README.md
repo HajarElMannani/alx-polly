@@ -1,124 +1,108 @@
 # ALX Polly
 
-A Next.js App Router polling application with Supabase authentication. Users can create, share, vote, and view results for polls.
+A modern polling application built with Next.js (App Router) and Supabase. Registered users create/manage polls and share them via link or QR; everyone can vote and view results.
+
+## Tech Stack
+- Next.js (App Router)
+- React 19
+- Supabase (Auth + Postgres + RLS)
+- Tailwind CSS 4
 
 ## Features
-
-- Poll Management (creator)
-  - Create, edit, delete polls
-  - Dashboard of your polls
-  - Author stored (id and display name)
+- Authentication (Supabase)
+  - Register (username, email, password), email verification notice
+  - Login / Logout
+  - Profile: update username, change password (old password required)
+- Polls (Supabase)
+  - Create, Edit, Delete
+  - Options (2+); per-option voting
+  - Require-login toggle to gate voting
+  - Public toggle (`is_public`) to appear on Explore
+  - Optional end date
 - Voting
-  - Public poll pages at `/polls/[id]`
-  - Per-option voting with duplicate-vote prevention (localStorage + user id)
-  - Optional: require login to vote
-- Results
-  - `/polls/[id]/results` shows counts and percentages
-  - Share link + QR code for the poll link
-- Auth (Supabase)
-  - Registration with username, email, password (email verification notice)
-  - Login, Logout, Profile (update username, change password with old password check)
-- UI
-  - Global navbar across pages
+  - Public poll pages; optional login enforcement
+  - Auth users: 1 vote per poll (DB constraint)
+  - Anonymous users: allowed if poll does not require login
+- Sharing
+  - Direct link + QR code on poll and results pages
+- Explore
+  - Public listing of polls with `is_public = true`
 
-## Requirements
+## Architecture
+- App Router with client components where interactivity is required (auth state, voting).
+- Supabase browser client for auth and database operations.
+- Row Level Security (RLS) ensures creators can only modify their own polls/options.
 
-- Node.js 20+
-- Supabase project (for auth)
+## Setup
+1) Requirements
+- Node 20+
+- Supabase project
 
-## Environment
-
-Create `.env.local` in the app root (the folder that contains `package.json`) with:
-
+2) Environment
+Create `alx-polly/alx-polly/.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Restart the dev server after setting env vars.
-
-## Install & Run
-
-```bash
+3) Install & Run (from the app directory)
+```
+cd alx-polly/alx-polly
 npm install
 npm run dev
 ```
+Open http://localhost:3000
 
-App runs at http://localhost:3000
+## Database (Supabase)
+Schema overview:
+- `profiles(id, username, created_at)` – mirrors `auth.users.id`; RLS enabled
+- `polls(id, author_id → profiles.id, title, description, allow_multiple, require_login, created_at, ends_at, is_public)`; RLS enabled
+- `poll_options(id, poll_id → polls.id, label, position)`; RLS enabled
+- `votes(id, poll_id → polls.id, option_id → poll_options.id, voter_id → profiles.id, created_at)`; RLS enabled
+- Index: unique vote per poll for authenticated users: `unique (poll_id, voter_id) where voter_id is not null`
 
-## Setup
 
-1) Node.js 20
-- Ensure Node 20 is active. If you use nvm:
-  - `nvm use` (an `.nvmrc` is provided) or `nvm install 20 && nvm use 20`.
+RLS policy checklist (summary):
+- polls: SELECT (public), INSERT/UPDATE/DELETE only when `author_id = auth.uid()`
+- poll_options: SELECT (public), ALL only when parent poll’s `author_id = auth.uid()`
+- votes: SELECT (public), INSERT (authenticated) with `voter_id = auth.uid()`, and INSERT (anon) only when poll `require_login = false`
 
-2) Supabase project
-- Create a new project at `https://app.supabase.com`.
-- Go to Project Settings → API and copy:
-  - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-  - anon public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- In Authentication → URL configuration, add these redirect URLs:
-  - `http://localhost:3000`
-  - Your production domain (when deployed)
+Troubleshooting:
+- If you add columns and the API can’t see them: run `notify pgrst, 'reload schema';` or restart the API (Settings → API).
+- Ensure RLS is enabled on all four tables and policies exist; missing policies will block writes.
 
-3) Environment variables
-- Create `.env.local` with the two keys above in the app root.
-- Restart your dev server after changes.
+## Routes
+- `/` – Landing page (hero + CTAs)
+- `/explore` – Public polls (is_public = true)
+- `/polls` – Your polls (login prompt if not authenticated)
+- `/create-poll` – Create (authenticated)
+- `/polls/[id]` – Vote (public; enforces require-login when enabled)
+- `/polls/[id]/results` – Results (counts, percentages, QR)
+- `/polls/[id]/edit` – Edit (author only)
+- `/login`, `/register`, `/profile`
 
-4) First run
-- Start the app: `npm run dev`.
-- Visit `/register` to create an account, then login at `/login`.
-- Create your first poll at `/create-poll`.
+## User Roles
+- Poll Creator (registered): create/edit/delete polls, set visibility, share, view results
+- Voter (registered or anonymous): open poll via link/QR, cast vote (login enforced if creator enabled)
 
-## Deployment
-
-### Vercel (recommended)
-1) Import the repository in Vercel.
-2) Set the Project Root to the directory that contains this app’s `package.json`.
-3) Set Environment Variables in Vercel → Settings → Environment Variables:
+## Deployment (Vercel)
+1) Import the project; set Project Root to `alx-polly/alx-polly`.
+2) Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - Optionally `NODE_VERSION=20` (Vercel also respects `engines.node` from `package.json`).
-4) Build & Output
-   - Build Command: `npm run build`
-   - Install Command: `npm install`
-   - Output Directory: `.next`
-5) Add your production domain to Supabase Authentication redirect URLs.
-6) Deploy.
+   - Optional `NODE_VERSION=20` (also set in `package.json` engines)
+3) Build settings:
+   - Install: `npm install`
+   - Build: `npm run build`
+   - Output: `.next`
+4) Add your production domain to Supabase Auth redirect URLs.
+5) Deploy.
 
-### Other platforms
-- Any Node hosting that supports Next.js App Router should work.
-- Ensure Node 20+, set the two Supabase env vars, and run `npm run build` then `npm start`.
+## Notes
+- Explore lists only polls with `is_public = true`.
+- Dashboard filters to the current user’s polls.
+- Authenticated duplicate votes blocked at DB; anonymous best-effort.
+- QR codes are generated via a public image service.
 
-## Key Scripts
-
-- `npm run dev` – start dev server
-- `npm run build` – build
-- `npm run start` – start production server
-- `npm run lint` – biome check
-- `npm run format` – biome format
-
-## App Structure (important routes)
-
-- `/` → Landing page (hero + CTAs)
-- `/polls` → dashboard (shows current user's polls if logged in)
-- `/create-poll` → create a poll (protected)
-- `/polls/[id]` → vote page (public), optional login required based on poll setting
-- `/polls/[id]/results` → results page with counts/percentages and QR code
-- `/polls/[id]/edit` → edit poll (author only)
-- `/login` → login page
-- `/register` → registration page
-- `/profile` → profile (view email, update username, change password)
-
-## Storage Notes
-
-This demo uses localStorage as a backend stub for polls:
-- Polls are saved in the browser and are not shared across devices.
-- Voting prevention uses both localStorage and the authenticated user id.
-- For production, replace `lib/storage.ts` with real API/database calls.
-
-## Further improvements
-
-- Editing options resets vote counts if the number of options changes.
-- Duplicate-vote prevention is best-effort on the client.
-- QR is generated via a public image API for convenience.
+## License
+MIT
