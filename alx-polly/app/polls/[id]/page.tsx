@@ -63,6 +63,15 @@ export default function VotePage() {
   };
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert("Link copied to clipboard");
+    } catch {
+      /* no-op */
+    }
+  };
 
   return (
     <main className="min-h-screen py-10 px-4">
@@ -111,9 +120,15 @@ export default function VotePage() {
           <span className="mx-2">•</span>
           <span>Created on {new Date(poll.createdAt).toLocaleDateString()}</span>
         </div>
-        <div className="mt-6 flex items-center justify-between">
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <div className="text-sm text-gray-600 break-all">
+            Share link: <a className="text-blue-600 hover:underline" href={shareUrl}>{shareUrl}</a>
+            <button onClick={copyLink} className="ml-2 text-blue-600 hover:underline">Copy</button>
+          </div>
+          <img src={qrUrl} alt="QR Code" className="w-20 h-20" />
+        </div>
+        <div className="mt-6 text-right">
           <a className="text-blue-600 hover:underline" href={`/polls/${poll.id}/results`}>View Results</a>
-          <div className="text-sm text-gray-600">Share link: <a className="text-blue-600 hover:underline" href={shareUrl}>{shareUrl}</a></div>
         </div>
       </div>
     </main>
