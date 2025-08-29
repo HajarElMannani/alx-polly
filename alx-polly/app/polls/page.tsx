@@ -71,6 +71,24 @@ export default function PollsDashboard() {
     } catch {}
   };
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm("Delete this poll? This cannot be undone.")) return;
+    const supabase = supabaseBrowser();
+    if (!supabase) return;
+    const { error } = await supabase.from("polls").delete().eq("id", id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setPolls(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleEdit = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    router.push(`/polls/${id}/edit`);
+  };
+
   return (
     <main className="w-full py-10 px-8">
       <div className="flex items-center justify-between mb-8">
@@ -104,13 +122,17 @@ export default function PollsDashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-xs text-gray-400">Created on {new Date(poll.created_at).toLocaleDateString()}</div>
-                <button
-                  className="text-blue-600 hover:underline text-xs"
-                  onClick={(e) => { e.stopPropagation(); setSharePollId(poll.id); }}
-                  type="button"
-                >
-                  Share
-                </button>
+                <div className="flex items-center gap-3">
+                  <button className="text-xs text-blue-600 hover:underline" onClick={(e) => handleEdit(e, poll.id)} type="button">Edit</button>
+                  <button className="text-xs text-red-600 hover:underline" onClick={(e) => handleDelete(e, poll.id)} type="button">Delete</button>
+                  <button
+                    className="text-blue-600 hover:underline text-xs"
+                    onClick={(e) => { e.stopPropagation(); setSharePollId(poll.id); }}
+                    type="button"
+                  >
+                    Share
+                  </button>
+                </div>
               </div>
             </div>
           ))}
