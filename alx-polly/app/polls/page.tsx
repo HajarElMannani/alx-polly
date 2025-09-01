@@ -123,6 +123,13 @@ export default function PollsDashboard() {
               <div className="flex items-center justify-between">
                 <div className="text-xs text-gray-400">Created on {new Date(poll.created_at).toLocaleDateString()}</div>
                 <div className="flex items-center gap-3">
+                  <a
+                    href={`/polls/${poll.id}/results`}
+                    className="text-xs text-blue-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Results
+                  </a>
                   <button className="text-xs text-blue-600 hover:underline" onClick={(e) => handleEdit(e, poll.id)} type="button">Edit</button>
                   <button className="text-xs text-red-600 hover:underline" onClick={(e) => handleDelete(e, poll.id)} type="button">Delete</button>
                   <button
