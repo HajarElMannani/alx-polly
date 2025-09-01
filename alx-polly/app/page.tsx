@@ -4,7 +4,7 @@ import { useAuth } from "../components/AuthProvider";
 export default function Home() {
   const { user } = useAuth();
   return (
-    <main className="relative min-h-screen flex items-center justify-center px-6 py-16 overflow-hidden">
+    <main className="relative min-h-screen flex items-center justify-center px-6 py-10 overflow-hidden">
       {/* Ambient gradient background */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -top-28 -left-24 h-80 w-80 rounded-full bg-gradient-to-br from-indigo-500/25 via-purple-500/20 to-rose-500/20 blur-3xl" />
@@ -15,7 +15,7 @@ export default function Home() {
       <div className="w-full max-w-3xl">
         <section className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-black via-gray-800 to-gray-700" />
-          <div className="relative px-8 py-24 sm:py-28 text-white text-center">
+          <div className="relative px-8 py-16 sm:py-20 text-white text-center">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">ALX Polly</h1>
             <p className="mt-4 max-w-2xl mx-auto text-gray-200">
               Create polls, share them with anyone, and see results in real time.

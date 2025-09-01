@@ -157,7 +157,7 @@ export default function CreatePollPage() {
                 </div>
               )}
             </div>
-            <Button type="submit" className="mt-6 self-end bg-black text-white" disabled={submitting}>
+            <Button type="submit" className="mt-3 self-end bg-black text-white" disabled={submitting}>
               {submitting ? "Creating..." : "Create Poll"}
             </Button>
           </form>
