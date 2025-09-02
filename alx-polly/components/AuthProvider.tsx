@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabaseBrowser } from "../lib/supabaseClient";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export type AuthContextValue = {
   user: { id: string; email: string | null; username?: string | null } | null;
@@ -34,16 +35,24 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       if (!isMounted) return;
       setUser(
         data.user
-          ? { id: data.user.id, email: data.user.email, username: (data.user.user_metadata as any)?.username ?? null }
+          ? {
+              id: data.user.id,
+              email: data.user.email ?? null,
+              username: (data.user.user_metadata as any)?.username ?? null,
+            }
           : null
       );
       setLoading(false);
     };
     init();
     if (!supabase) return;
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       const u = session?.user;
-      setUser(u ? { id: u.id, email: u.email, username: (u.user_metadata as any)?.username ?? null } : null);
+      setUser(
+        u
+          ? { id: u.id, email: u.email ?? null, username: (u.user_metadata as any)?.username ?? null }
+          : null
+      );
     });
     return () => {
       isMounted = false;
