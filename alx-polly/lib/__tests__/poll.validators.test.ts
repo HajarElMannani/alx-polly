@@ -23,6 +23,28 @@ describe("createPollSchema", () => {
   it("rejects duplicate options case-insensitively", () => {
     expect(() => createPollSchema.parse({ title: "Title", options: ["A", "a"] })).toThrow(ValidationError);
   });
+
+  it("trims and removes empty option strings", () => {
+    expect(() => createPollSchema.parse({ title: "Title", options: [" ", "\t", "\n"] })).toThrow(ValidationError);
+  });
+
+  it("rejects non-object inputs", () => {
+    expect(() => createPollSchema.parse(null)).toThrow(ValidationError);
+    expect(() => createPollSchema.parse(undefined)).toThrow(ValidationError);
+    expect(() => createPollSchema.parse("string")).toThrow(ValidationError);
+  });
+
+  it("coerces only string options; non-strings become empty and get filtered", () => {
+    expect(() => createPollSchema.parse({ title: "Title", options: ["A", 1 as any] })).toThrow(ValidationError);
+    // valid when enough string options remain after trimming
+    const res = createPollSchema.parse({ title: "Title", options: ["A ", " B", true as any, null as any, "C"] });
+    expect(res.options).toEqual(["A", "B", "C"]);
+  });
+
+  it("accepts exactly 2 and exactly 6 options", () => {
+    expect(createPollSchema.parse({ title: "Ttl", options: ["A", "B"] }).options.length).toBe(2);
+    expect(createPollSchema.parse({ title: "Title", options: ["A", "B", "C", "D", "E", "F"] }).options.length).toBe(6);
+  });
 });
 
 describe("voteSchema", () => {
@@ -39,6 +61,11 @@ describe("voteSchema", () => {
 
   it("rejects out-of-range when optionsCount provided", () => {
     expect(() => voteSchema.parse({ optionIndex: 3 }, { optionsCount: 3 })).toThrow(ValidationError);
+  });
+
+  it("rejects invalid optionsCount values when provided", () => {
+    expect(() => voteSchema.parse({ optionIndex: 0 }, { optionsCount: 0 as any })).toThrow(ValidationError);
+    expect(() => voteSchema.parse({ optionIndex: 0 }, { optionsCount: -1 as any })).toThrow(ValidationError);
   });
 });
 
