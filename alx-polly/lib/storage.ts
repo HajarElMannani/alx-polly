@@ -90,18 +90,46 @@ export function setVotedBrowser(pollId: string) {
 }
 
 export function recordVote(pollId: string, optionIndex: number, voterId?: string): StoredPoll | undefined {
-  return updatePoll(pollId, (p) => {
-    const next = { ...p };
-    if (!next.optionVotes || next.optionVotes.length !== next.options.length) {
-      next.optionVotes = new Array(next.options.length).fill(0);
+  const all = getPolls();
+  const idx = all.findIndex(p => p.id === pollId);
+  if (idx === -1) return undefined;
+
+  const current = all[idx];
+
+  // Validate option index early and bail out without writing if invalid
+  const optionsLength = current.options.length;
+  if (optionIndex < 0 || optionIndex >= optionsLength) return undefined;
+
+  // Build next state with defensive copies only where needed
+  const next: StoredPoll = { ...current };
+
+  // Ensure optionVotes exists and matches options length
+  let optionVotes = next.optionVotes;
+  if (!optionVotes || optionVotes.length !== optionsLength) {
+    optionVotes = new Array(optionsLength).fill(0);
+  } else {
+    optionVotes = optionVotes.slice();
+  }
+  optionVotes[optionIndex] = (optionVotes[optionIndex] ?? 0) + 1;
+  next.optionVotes = optionVotes;
+
+  next.votes = (next.votes ?? 0) + 1;
+
+  if (voterId) {
+    const existing = next.voters ?? [];
+    if (existing.length === 0) {
+      next.voters = [voterId];
+    } else if (!existing.includes(voterId)) {
+      // Append without rebuilding when not necessary
+      next.voters = [...existing, voterId];
+    } else {
+      // Keep the same reference to avoid unnecessary allocations
+      next.voters = existing;
     }
-    next.optionVotes[optionIndex] = (next.optionVotes[optionIndex] ?? 0) + 1;
-    next.votes = (next.votes ?? 0) + 1;
-    if (voterId) {
-      const set = new Set(next.voters ?? []);
-      set.add(voterId);
-      next.voters = Array.from(set);
-    }
-    return next;
-  });
+  }
+
+  // Write once
+  all[idx] = next;
+  savePolls(all);
+  return next;
 }
