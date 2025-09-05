@@ -6,6 +6,15 @@ import Button from "../../components/shadcn/Button";
 import { useAuth } from "../../components/AuthProvider";
 import { supabaseBrowser } from "../../lib/supabaseClient";
 
+/**
+ * ProfilePage
+ *
+ *  Lets authenticated users update profile metadata and change passwords.
+ *  Account management screen integrated with Supabase auth/profile tables.
+ *  User session provides email; username stored in user metadata.
+ *  Verifies old password before updating; shows inline status and error messages.
+ *  Calls Supabase auth update APIs and reads from `useAuth()`.
+ */
 export default function ProfilePage() {
   const { user } = useAuth();
   const supabase = supabaseBrowser();
@@ -46,7 +55,7 @@ export default function ProfilePage() {
       setError("New password must be at least 6 characters.");
       return;
     }
-    // Verify old password by signing in
+    // Verify old password by signing in before updating
     const { error: verifyErr } = await supabase!.auth.signInWithPassword({ email, password: oldPassword });
     if (verifyErr) {
       setError("Old password is incorrect.");

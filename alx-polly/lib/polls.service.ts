@@ -2,6 +2,16 @@ import { addPoll, deletePoll, getPollById, getPolls, hasVotedBrowser, recordVote
 import { createPollSchema, voteSchema, ValidationError } from "./validators/poll";
 import { canVote } from "./authz";
 
+/**
+ * pollsService
+ *
+ *  In-memory/localStorage backed service that encapsulates poll CRUD and voting.
+ *  UI components call this boundary to avoid duplicating business rules.
+ *  Browser environment with access to `localStorage`.
+ *  Duplicate voting prevention via user id and browser flag; closed polls disallow votes.
+ *  Coordinates with validators, authorization helpers, and storage utilities.
+ */
+
 export type CreatePollServiceInput = {
   title: string;
   options: string[];
@@ -34,10 +44,10 @@ export const pollsService = {
   },
 
   create(input: CreatePollServiceInput, user: ServiceUser): StoredPoll {
-    // validate basic shape
+    // Validate minimal, required fields using our schema.
     const parsed = createPollSchema.parse({ title: input.title, options: input.options });
 
-    // derive fields
+    // Derive normalized and display fields from input and user.
     const title = parsed.title;
     const slug = normalizeTitleToSlug(title);
     const authorId = user?.id;
@@ -55,11 +65,11 @@ export const pollsService = {
         requireLogin: Boolean(input.requireLogin),
         endDate: input.endDate ?? undefined,
       },
-      // carry a slug in description for potential routing or display
+      // Keep track of voters to prevent duplicate votes by user id.
       voters: [],
     });
 
-    // Currently slug not used; could set created.id = slug if desired in future
+    // Note: Slug currently unused; we may map id to slug in future routing.
     return created;
   },
 
@@ -67,10 +77,11 @@ export const pollsService = {
     const poll = getPollById(pollId);
     if (!poll) throw new Error("Poll not found");
 
-    // Validate optionIndex
+    // Validate the selected option index and its bounds against options count.
     voteSchema.parse({ optionIndex }, { optionsCount: poll.options.length });
 
-    // Prevent duplicate votes: user id based and browser best-effort
+    // Prevent duplicate votes via both user id (authoritative) and
+    // a best-effort browser flag for anonymous sessions.
     const voterId = user?.id ?? undefined;
     if (voterId && (poll.voters ?? []).includes(voterId)) {
       throw new ValidationError("Duplicate vote", ["User has already voted"]);
@@ -79,7 +90,7 @@ export const pollsService = {
       throw new ValidationError("Duplicate vote", ["This browser has already voted on this poll"]);
     }
 
-    // Check poll open and login requirement
+    // Check that the poll is open and the user meets login requirements.
     const endsAt = poll.settings?.endDate ? new Date(poll.settings.endDate) : null;
     const authz = canVote(user ?? null, {
       authorId: poll.authorId ?? null,
@@ -93,7 +104,7 @@ export const pollsService = {
     const updated = recordVote(pollId, optionIndex, voterId);
     if (!updated) throw new Error("Failed to record vote");
 
-    // mark browser voted after success
+    // Mark browser as having voted only after persistence succeeds.
     setVotedBrowser(pollId);
     return updated;
   },

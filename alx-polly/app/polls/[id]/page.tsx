@@ -16,6 +16,15 @@ type PollRow = {
   author_id: string;
 };
 
+/**
+ * VotePage
+ *
+ *  Displays a single poll and enables selection and vote submission.
+ * Context: Orchestrates auth checks, duplicate prevention, and navigation to results.
+ *  Supabase tables `polls`, `poll_options`, and `votes` exist with expected columns.
+ *  Redirects if poll not found; disallows multiple votes; prompts login when needed.
+ *  Reads via Supabase client, writes a vote row, and then routes to results.
+ */
 export default function VotePage() {
   const params = useParams();
   const router = useRouter();
@@ -32,7 +41,7 @@ export default function VotePage() {
     const fetchData = async () => {
       const supabase = supabaseBrowser();
       if (!supabase || !pollId) return;
-      // Poll
+      // Load poll metadata
       const { data: p } = await supabase
         .from("polls")
         .select("id,title,description,require_login,created_at,author_id")
@@ -43,7 +52,7 @@ export default function VotePage() {
         return;
       }
       setPoll(p as PollRow);
-      // Options with vote counts
+      // Load options with aggregated vote counts
       const { data: opts } = await supabase
         .from("poll_options")
         .select("id,label,position, votes:votes(count)")
@@ -51,7 +60,7 @@ export default function VotePage() {
         .order("position", { ascending: true });
       const normalized = (opts || []).map((o: any) => ({ id: o.id, label: o.label, position: o.position, vote_count: o.votes?.[0]?.count ?? 0 }));
       setOptions(normalized);
-      // Check if current user has voted
+      // Check if current user has already voted to disable duplicate voting
       if (user?.id) {
         const { data: v } = await supabase
           .from("votes")
@@ -84,6 +93,7 @@ export default function VotePage() {
       return;
     }
     const option = options[selectedIndex];
+    // Insert a vote row. If not logged in, we still allow voting (subject to poll settings).
     const { error } = await supabase.from("votes").insert({ poll_id: poll.id, option_id: option.id, voter_id: user?.id ?? null });
     if (error) {
       alert(error.message);

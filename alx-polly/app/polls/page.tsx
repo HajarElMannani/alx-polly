@@ -14,6 +14,15 @@ type PollRow = {
   votes: { count: number }[];
 };
 
+/**
+ * PollsDashboard
+ *
+ *  Lists the authenticated user's polls with quick actions (results, edit, delete, share).
+ * Context: Primary dashboard for authors to manage content and navigate to detail pages.
+ *  User is logged in; Supabase schema provides counts via relationships.
+ *  Shows login prompt when unauthenticated; handles empty lists and loading states.
+ *  Links to EditPollPage, ResultsPage, and the voting page; invokes Supabase mutations.
+ */
 export default function PollsDashboard() {
   const [polls, setPolls] = useState<PollRow[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,8 @@
 // Simple, dependency-free validation utilities for polls
+//
+//  Minimal runtime validation for creating polls and casting votes.
+//  Keeps client logic predictable and resilient without adding heavy
+// schema libraries, and provides clear, user-friendly error messages.
 
 export const MIN_QUESTION_LENGTH = 3;
 export const MIN_OPTIONS = 2;
@@ -47,6 +51,15 @@ function uniqueCaseInsensitive(values: string[]): string[] {
 }
 
 export const createPollSchema = {
+  /**
+   * Purpose: Parses and validates input for creating a poll.
+   * Context: Enforces minimum title length, required number of options,
+   * and uniqueness before persistence.
+   * Assumptions: Raw input is an object-like payload; options contain strings.
+   * Edge cases: Trims whitespace, filters empty strings, caps total options, and
+   * deduplicates case-insensitively.
+   * Interactions: Used by `pollsService.create` prior to writing to storage.
+   */
   parse(input: unknown): CreatePollInput {
     const obj = toStringRecord(input);
     const issues: string[] = [];
@@ -89,6 +102,14 @@ export const createPollSchema = {
 
 export const voteSchema = {
   // Optionally supply optionsCount to enforce bounds
+  /**
+   * Purpose: Parses and validates input for a vote action.
+   * Context: Ensures the selected option index is an integer and within range
+   * when the options count is known.
+   * Assumptions: `optionIndex` originates from a UI selection (radio/button).
+   * Edge cases: Rejects negative numbers, non-integers, and out-of-bounds indices.
+   * Interactions: Used by `pollsService.vote` to guard writes.
+   */
   parse(input: unknown, ctx?: { optionsCount?: number }): VoteInput {
     const obj = toStringRecord(input);
     const issues: string[] = [];

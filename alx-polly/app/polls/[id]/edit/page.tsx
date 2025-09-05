@@ -15,6 +15,15 @@ type PollRow = {
 
 type OptionRow = { id: string; label: string; position: number };
 
+/**
+ * EditPollPage
+ *
+ *  Allows poll authors to update poll title, description, and options.
+ * Context: Client-side guard ensures only authors can access editing controls.
+ *  Poll and options exist in Supabase and are identified by `poll_id`.
+ *  Redirects non-authors; replaces options atomically to preserve order.
+ *  Reads and writes via Supabase; navigates back to the poll on success.
+ */
 export default function EditPollPage() {
   const params = useParams();
   const router = useRouter();
@@ -80,13 +89,13 @@ export default function EditPollPage() {
     setSaving(true);
     const supabase = supabaseBrowser();
     try {
-      // Update poll
+      // Update poll metadata
       const { error: upErr } = await supabase!.from("polls").update({
         title: title.trim(),
         description: description.trim() || null,
       }).eq("id", poll.id);
       if (upErr) throw upErr;
-      // Replace options: delete then insert
+      // Replace options: delete then insert to keep positions consistent
       const { error: delErr } = await supabase!.from("poll_options").delete().eq("poll_id", poll.id);
       if (delErr) throw delErr;
       const optionRows = trimmed.map((label, index) => ({ poll_id: poll.id, label, position: index }));

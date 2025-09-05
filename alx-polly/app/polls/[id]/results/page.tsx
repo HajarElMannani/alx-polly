@@ -7,6 +7,15 @@ type PollRow = { id: string; title: string };
 
 type OptionRow = { id: string; label: string; vote_count: number };
 
+/**
+ * ResultsPage
+ *
+ *  Displays aggregated results for a poll with simple percentage bars.
+ * Context: Immediate feedback after voting and a shareable view for others.
+ *  Vote counts are aggregated via Supabase foreign table queries.
+ *  Handles zero-total votes by rendering 0% bars; returns null until poll loads.
+ *  Reads poll and option aggregates; pairs with VotePage and dashboard links.
+ */
 export default function ResultsPage() {
   const params = useParams();
   const pollId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);

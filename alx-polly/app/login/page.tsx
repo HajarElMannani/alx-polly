@@ -5,6 +5,15 @@ import Button from "../../components/shadcn/Button";
 import { useAuth } from "../../components/AuthProvider";
 import { useRouter } from "next/navigation";
 
+/**
+ * LoginPage
+ *
+ *  Email/password form that authenticates via `useAuth().signIn`.
+ * Context: Entry point for users to access private areas and manage polls.
+ *  Credentials map to a Supabase user; redirects on success.
+ *  Surfaces provider errors to the UI; disables submit during requests.
+ *  Uses auth provider and Next.js navigation to route to `/polls`.
+ */
 export default function LoginPage() {
   const { signIn } = useAuth();
   const router = useRouter();
@@ -17,6 +26,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    // Delegate to auth provider; bubble up user-friendly error if present.
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) setError(error);

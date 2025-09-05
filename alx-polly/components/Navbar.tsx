@@ -4,6 +4,15 @@ import Button from "./shadcn/Button";
 import { useAuth } from "./AuthProvider";
 import { useRouter } from "next/navigation";
 
+/**
+ * Navbar
+ *
+ *  Top navigation bar with context-aware links and profile actions.
+ *  Quick access to Explore, My Polls, Create, and account actions.
+ *  Auth state comes from `useAuth()`; client-side navigation available.
+ *  Prevents navigating to private areas without login; closes dropdown on logout.
+ *  Reads current user and triggers `signOut()`; routes via Next.js navigation.
+ */
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);

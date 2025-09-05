@@ -7,6 +7,15 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 import { useAuth } from "../../components/AuthProvider";
 import { supabaseBrowser } from "../../lib/supabaseClient";
 
+/**
+ * CreatePollPage
+ *
+ *  Multi-tab form for authors to create a new poll with options and settings.
+ * Context: Guides through basic info and advanced settings to produce consistent rows.
+ *  Authenticated user exists; Supabase schema for polls/options is available.
+ *  Validates minimum options; prevents submission without title; disables while submitting.
+ *  Writes poll and its options; routes to the new poll page after creation.
+ */
 export default function CreatePollPage() {
   const router = useRouter();
   const { user } = useAuth();
