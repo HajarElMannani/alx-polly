@@ -106,3 +106,37 @@ Troubleshooting:
 
 ## License
 MIT
+
+## Usage Examples
+- Creating a poll
+  - Go to `/create-poll`
+  - Enter a Title and at least two Options
+  - (Optional) Toggle Require login, set an end date, and mark as public
+  - Submit to create, then find it under `/polls`
+- Voting on a poll
+  - Open a poll page under `/polls/[id]`
+  - Select an option and submit your vote
+  - If the poll requires login, you’ll be prompted to sign in first
+- Viewing results
+  - Visit `/polls/[id]/results` to see counts and percentages
+  - Use the QR/share link on the results page to share with others
+
+## Supabase Setup (recap)
+- Create a Supabase project and obtain:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Put them in `alx-polly/alx-polly/.env.local` as shown above
+- (Recommended) Apply the schema and RLS from the Database section to enable secure create/update/delete and one-vote-per-user rules
+
+## Local Development & Testing
+- Run locally
+  - `cd alx-polly/alx-polly`
+  - `npm install`
+  - `npm run dev` → open http://localhost:3000
+- Run tests
+  - `npm test` (from `alx-polly/alx-polly`)
+  - Includes validation/authz and storage integration tests
+- Common troubleshooting
+  - Ensure `.env.local` contains your Supabase URL and anon key
+  - If you change the database schema in Supabase, reload API cache or restart the Supabase API
+  - If voting/auth appears inconsistent across tabs, sign out and back in to refresh the session
