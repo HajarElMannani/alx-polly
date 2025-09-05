@@ -23,6 +23,13 @@ export type CreatePollServiceInput = {
 
 export type ServiceUser = { id: string; email?: string | null; username?: string | null } | null | undefined;
 
+/**
+ * Transforms a free-form title into a URL-safe slug.
+ * Why: Normalizes titles so we can reuse for URLs/anchors without leaking punctuation.
+ * Assumptions: ASCII letters/numbers are retained; other characters are stripped.
+ * Edge cases: Multiple spaces collapse to a single hyphen; leading/trailing hyphens removed.
+ * Connects: Optionally used by routes or share links; currently not persisted.
+ */
 function normalizeTitleToSlug(title: string): string {
   return title
     .trim()
@@ -35,6 +42,13 @@ function normalizeTitleToSlug(title: string): string {
 
 export const pollsService = {
   list(ownerId?: string): StoredPoll[] {
+    /**
+     * Returns all polls or filters by owner for dashboard views.
+     * Why: Helps dashboards render only the requesting user's polls without extra logic upstream.
+     * Assumptions: Storage returns well-formed polls; filtering is cheap in-memory.
+     * Edge cases: No polls or unknown owner returns an empty array.
+     * Connects: Used by pages listing polls; can be replaced by server/API in future.
+     */
     const all = getPolls();
     return ownerId ? all.filter((p) => p.authorId === ownerId) : all;
   },
@@ -44,6 +58,13 @@ export const pollsService = {
   },
 
   create(input: CreatePollServiceInput, user: ServiceUser): StoredPoll {
+    /**
+     * Validates and persists a new poll authored by the current user.
+     * Why: Centralizes validation and derivation (slug/author) to keep UI simple and safe.
+     * Assumptions: Title/options provided by user; username/email shown for author display.
+     * Edge cases: Empty/duplicate options rejected; description optional and trimmed.
+     * Connects: Invoked by `PollForm`; feeds `PollList` and detail pages.
+     */
     // Validate minimal, required fields using our schema.
     const parsed = createPollSchema.parse({ title: input.title, options: input.options });
 
@@ -74,6 +95,13 @@ export const pollsService = {
   },
 
   vote(pollId: string, optionIndex: number, user?: ServiceUser): StoredPoll {
+    /**
+     * Applies a vote once per user (and per browser as best-effort) for a poll option.
+     * Why: Prevents ballot stuffing and enforces closed/login-required policies.
+     * Assumptions: Option index comes from UI; validators enforce bounds.
+     * Edge cases: Duplicate vote detected by voter id or browser flag; closed poll; login required.
+     * Connects: Called by vote buttons; updates are reflected in results components.
+     */
     const poll = getPollById(pollId);
     if (!poll) throw new Error("Poll not found");
 
@@ -110,6 +138,13 @@ export const pollsService = {
   },
 
   close(id: string): StoredPoll {
+    /**
+     * Closes an active poll by setting its end date to now.
+     * Why: Simplifies business logic for stopping new votes.
+     * Assumptions: Poll exists in storage; UI prevents closing twice.
+     * Edge cases: Missing poll id → error; idempotent behavior is acceptable.
+     * Connects: Admin/owner controls for lifecycle management.
+     */
     const updated = updatePoll(id, (p) => {
       const next = { ...p };
       const nowIso = new Date().toISOString();
@@ -125,6 +160,13 @@ export const pollsService = {
   },
 
   remove(id: string): boolean {
+    /**
+     * Removes a poll by id.
+     * Why: Keeps destructive action behind a single function for auditability.
+     * Assumptions: Caller is authorized at a higher level; storage returns a boolean.
+     * Edge cases: Unknown id returns false so callers can distinguish not-found.
+     * Connects: Used by admin/owner delete actions in UI.
+     */
     return deletePoll(id);
   },
 };

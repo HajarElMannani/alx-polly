@@ -42,6 +42,15 @@ export const useAuth = () => {
   return ctx;
 };
 
+/**
+ * Provides authenticated user state and auth helpers to the React tree.
+ * Why: Consolidates auth interactions so components can remain declarative and
+ *  avoid coupling to Supabase APIs directly.
+ * Assumptions: Browser environment; Supabase env vars configured; cookies/local storage
+ *  manage session according to Supabase defaults.
+ * Edge cases: Missing env disables network calls; we keep UI usable by setting loading=false.
+ * Connects: Wraps the app in `app/layout.tsx`, consumed by guards, navbars, and pages.
+ */
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = supabaseBrowser();
   const [user, setUser] = useState<AuthContextValue["user"]>(null);

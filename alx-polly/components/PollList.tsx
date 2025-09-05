@@ -7,6 +7,13 @@ const sample: Poll[] = [
   { id: "2", title: "Best pet?", options: [{ id: "a", label: "Cat" }, { id: "b", label: "Dog" }], createdAt: new Date().toISOString() },
 ];
 
+/**
+ * Renders a list of polls with quick action buttons.
+ * Why: Provides a simple overview for the dashboard and a place to launch actions.
+ * Assumptions: Data will eventually come from a service/API; here we stub sample data.
+ * Edge cases: Empty lists should render a friendly empty state (future enhancement).
+ * Connects: Buttons trigger navigation or voting; integrates with pollsService in real flows.
+ */
 export default function PollList() {
   return (
     <div className="space-y-4">

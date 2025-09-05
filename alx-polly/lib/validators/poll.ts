@@ -4,7 +4,15 @@
 //  Keeps client logic predictable and resilient without adding heavy
 // schema libraries, and provides clear, user-friendly error messages.
 
+/**
+ * Minimum number of characters required for a poll title/question.
+ * Why: Discourages trivial/empty prompts while remaining user-friendly.
+ */
 export const MIN_QUESTION_LENGTH = 3;
+/**
+ * Bounds for number of selectable options a poll can have.
+ * Why: Enforces meaningful choice while keeping UI manageable.
+ */
 export const MIN_OPTIONS = 2;
 export const MAX_OPTIONS = 6;
 

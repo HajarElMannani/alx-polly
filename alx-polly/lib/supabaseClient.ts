@@ -14,6 +14,13 @@ let browserClient: SupabaseClient | null = null;
  *  Consumed by auth provider, pages that read/write polls, and profile flows.
  */
 export const supabaseBrowser = (): SupabaseClient | null => {
+  /**
+   * Why: Centralizes creation of a single browser Supabase client so
+   *  the app shares session state and avoids repeated instantiation.
+   * Assumptions: Only anon key is used in the browser; service-role keys are never exposed.
+   * Edge cases: In dev without env vars, we warn and return null so the UI can still render.
+   * Connects: Consumed by `AuthProvider`, forms that need user info, and lightweight reads.
+   */
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
   if (!url || !anon) {
