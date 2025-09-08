@@ -80,6 +80,11 @@ export default function PollsDashboard() {
     } catch {}
   };
 
+  const handleEdit = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    router.push(`/polls/${id}/edit`);
+  };
+
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!confirm("Delete this poll? This cannot be undone.")) return;
@@ -93,10 +98,6 @@ export default function PollsDashboard() {
     setPolls(prev => prev.filter(p => p.id !== id));
   };
 
-  const handleEdit = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    router.push(`/polls/${id}/edit`);
-  };
 
   return (
     <main className="w-full py-10 px-8">

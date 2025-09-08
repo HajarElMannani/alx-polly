@@ -1,11 +1,14 @@
 import React from "react";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  as?: "button" | "a";
   variant?: "default" | "ghost";
+  href?: string;
 };
 
 export const Button: React.FC<ButtonProps> = ({
   children,
+  as = "button",
   variant = "default",
   className = "",
   ...props
@@ -17,10 +20,12 @@ export const Button: React.FC<ButtonProps> = ({
     ghost: "bg-transparent border border-gray-200",
   };
 
+  const Component = as;
+
   return (
-    <button className={`${base} ${variants[variant]} ${className}`} {...props}>
+    <Component className={`${base} ${variants[variant]} ${className}`} {...props}>
       {children}
-    </button>
+    </Component>
   );
 };
 

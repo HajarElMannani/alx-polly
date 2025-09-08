@@ -4,8 +4,8 @@ import Input from "../../components/shadcn/Input";
 import Button from "../../components/shadcn/Button";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { useAuth } from "../../components/AuthProvider";
 import { supabaseBrowser } from "../../lib/supabaseClient";
+import { createPoll } from "./actions";
 
 /**
  * CreatePollPage
@@ -18,15 +18,8 @@ import { supabaseBrowser } from "../../lib/supabaseClient";
  */
 export default function CreatePollPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("basic");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [options, setOptions] = useState(["", ""]);
-  const [allowMultiple, setAllowMultiple] = useState(false);
-  const [requireLogin, setRequireLogin] = useState(false);
-  const [isPublic, setIsPublic] = useState(true);
-  const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleOptionChange = (idx: number, value: string) => {
@@ -37,40 +30,28 @@ export default function CreatePollPage() {
     setOptions((opts) => [...opts, ""]);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) return;
-    const trimmed = options.map(o => o.trim()).filter(Boolean);
-    if (!title.trim() || trimmed.length < 2) {
-      alert("Please enter a title and at least two options.");
-      return;
-    }
     setSubmitting(true);
-    const supabase = supabaseBrowser();
+    const formData = new FormData(e.currentTarget);
+    // Attach access token for server action if cookies are unavailable
     try {
-      await supabase!.from("profiles").upsert({ id: user.id, username: user.username || user.email || "anonymous" });
-      const { data: pollRow, error: pollErr } = await supabase!
-        .from("polls")
-        .insert({
-          author_id: user.id,
-          title: title.trim(),
-          description: description.trim() || null,
-          allow_multiple: allowMultiple,
-          require_login: requireLogin,
-          is_public: isPublic,
-          ends_at: endDate ? new Date(endDate).toISOString() : null,
-        })
-        .select("id")
-        .single();
-      if (pollErr || !pollRow) throw pollErr || new Error("Failed to create poll");
-      const optionRows = trimmed.map((label, index) => ({ poll_id: pollRow.id, label, position: index }));
-      const { error: optErr } = await supabase!.from("poll_options").insert(optionRows);
-      if (optErr) throw optErr;
-      router.push(`/polls/${pollRow.id}`);
-    } catch (err: any) {
-      alert(err?.message || "Something went wrong while creating the poll");
-    } finally {
-      setSubmitting(false);
+      const supabase = supabaseBrowser();
+      const { data } = (await supabase?.auth.getSession()) ?? { data: undefined };
+      const token = data?.session?.access_token;
+      if (token) {
+        formData.set("accessToken", token);
+      }
+    } catch {}
+    options.forEach((option) => {
+      formData.append("options[]", option);
+    });
+    const result = await createPoll(formData);
+    setSubmitting(false);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      router.push(`/polls/${result.pollId}`);
     }
   };
 
@@ -102,8 +83,8 @@ export default function CreatePollPage() {
                   <h2 className="text-xl font-semibold mb-1">Poll Information</h2>
                   <p className="text-gray-500 mb-6">Enter the details of your new poll.</p>
                   <div className="flex flex-col gap-4">
-                    <Input label="Poll Title" placeholder="Enter poll title" name="title" required value={title} onChange={e => setTitle(e.target.value)} />
-                    <Input label="Description (optional)" placeholder="Enter description" name="description" value={description} onChange={e => setDescription(e.target.value)} />
+                    <Input label="Poll Title" placeholder="Enter poll title" name="title" required />
+                    <Input label="Description (optional)" placeholder="Enter description" name="description" />
                     <div>
                       <label className="text-sm font-medium">Poll Options</label>
                       <div className="flex flex-col gap-2 mt-2">
@@ -133,8 +114,8 @@ export default function CreatePollPage() {
                       <input
                         type="checkbox"
                         className="h-4 w-4"
-                        checked={allowMultiple}
-                        onChange={(e) => setAllowMultiple(e.target.checked)}
+                        name="allowMultiple"
+                        value="true"
                       />
                       <span>Allow users to select multiple options</span>
                     </label>
@@ -142,8 +123,8 @@ export default function CreatePollPage() {
                       <input
                         type="checkbox"
                         className="h-4 w-4"
-                        checked={requireLogin}
-                        onChange={(e) => setRequireLogin(e.target.checked)}
+                        name="requireLogin"
+                        value="true"
                       />
                       <span>Require users to be logged in to vote</span>
                     </label>
@@ -151,16 +132,16 @@ export default function CreatePollPage() {
                       <input
                         type="checkbox"
                         className="h-4 w-4"
-                        checked={isPublic}
-                        onChange={(e) => setIsPublic(e.target.checked)}
+                        name="isPublic"
+                        value="true"
+                        defaultChecked
                       />
                       <span>List this poll on Explore (public)</span>
                     </label>
                     <Input
                       label="Poll End Date (optional)"
                       type="datetime-local"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      name="endDate"
                     />
                   </div>
                 </div>

@@ -1,80 +1,83 @@
-"use client";
-import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
-import { supabaseBrowser } from "../../../../lib/supabaseClient";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { cookies } from "next/headers";
 
 type PollRow = { id: string; title: string };
 
 type OptionRow = { id: string; label: string; vote_count: number };
 
-/**
- * ResultsPage
- *
- *  Displays aggregated results for a poll with simple percentage bars.
- * Context: Immediate feedback after voting and a shareable view for others.
- *  Vote counts are aggregated via Supabase foreign table queries.
- *  Handles zero-total votes by rendering 0% bars; returns null until poll loads.
- *  Reads poll and option aggregates; pairs with VotePage and dashboard links.
- */
-export default function ResultsPage() {
-  const params = useParams();
-  const pollId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
-  const [poll, setPoll] = useState<PollRow | null>(null);
-  const [options, setOptions] = useState<OptionRow[]>([]);
+export default async function ResultsPage({ params }: { params: { id: string } }) {
+  const cookieStore = cookies();
+  const supabase = supabaseServer(cookieStore);
+  const pollId = params.id;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const supabase = supabaseBrowser();
-      if (!supabase || !pollId) return;
-      const { data: p } = await supabase
-        .from("polls")
-        .select("id,title")
-        .eq("id", pollId)
-        .single();
-      if (p) setPoll(p as PollRow);
-      const { data: opts } = await supabase
-        .from("poll_options")
-        .select("id,label, votes:votes(count)")
-        .eq("poll_id", pollId)
-        .order("position", { ascending: true });
-      const normalized = (opts || []).map((o: any) => ({ id: o.id, label: o.label, vote_count: o.votes?.[0]?.count ?? 0 }));
-      setOptions(normalized);
-    };
-    fetchData();
-  }, [pollId]);
+  const { data: poll } = await supabase
+    .from("polls")
+    .select("id,title")
+    .eq("id", pollId)
+    .single();
 
-  const totals = useMemo(() => {
-    const total = options.reduce((a, b) => a + (b.vote_count || 0), 0);
-    const percents = options.map(o => (total === 0 ? 0 : Math.round((o.vote_count * 100) / total)));
-    return { total, percents };
-  }, [options]);
+  if (!poll) {
+    return (
+      <main className="min-h-screen py-10 px-4">
+        <div className="w-full max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold">Poll not found</h1>
+          <p className="text-gray-600 mt-2">
+            The poll you are looking for does not exist or has been deleted.
+          </p>
+          <a href="/polls" className="text-blue-600 hover:underline mt-4 inline-block">
+            Back to Polls
+          </a>
+        </div>
+      </main>
+    );
+  }
 
-  if (!poll) return null;
+  const { data: opts } = await supabase
+    .from("poll_options")
+    .select("id,label, votes:votes(count)")
+    .eq("poll_id", pollId)
+    .order("position", { ascending: true });
 
-  const shareUrl = typeof window !== "undefined" ? window.location.origin + "/polls/" + poll.id : "";
+  const options = (opts || []).map((o: any) => ({
+    id: o.id,
+    label: o.label,
+    vote_count: o.votes?.[0]?.count ?? 0,
+  }));
+
+  const totalVotes = options.reduce((acc, o) => acc + o.vote_count, 0);
+
+  const shareUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/polls/${poll.id}` : `http://localhost:3000/polls/${poll.id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
 
   return (
     <main className="min-h-screen py-10 px-4">
       <div className="w-full max-w-xl mx-auto bg-white rounded-lg shadow p-8">
         <h1 className="text-2xl font-bold">Results: {poll.title}</h1>
-        <div className="mt-4 text-sm text-gray-600">Total votes: {totals.total}</div>
+        <div className="mt-4 text-sm text-gray-600">Total votes: {totalVotes}</div>
         <div className="mt-6 space-y-3">
-          {options.map((opt, idx) => (
+          {options.map((opt) => (
             <div key={opt.id}>
               <div className="flex justify-between text-sm">
                 <span>{opt.label}</span>
-                <span>{opt.vote_count} ({totals.percents[idx] ?? 0}%)</span>
+                <span>
+                  {opt.vote_count} ({totalVotes > 0 ? Math.round((opt.vote_count / totalVotes) * 100) : 0}%)
+                </span>
               </div>
               <div className="w-full h-2 bg-gray-200 rounded">
-                <div className="h-2 bg-black rounded" style={{ width: `${totals.percents[idx] ?? 0}%` }} />
+                <div
+                  className="h-2 bg-black rounded"
+                  style={{ width: `${totalVotes > 0 ? Math.round((opt.vote_count / totalVotes) * 100) : 0}%` }}
+                />
               </div>
             </div>
           ))}
         </div>
         <div className="mt-8 flex items-center justify-between">
           <div className="text-sm text-gray-600 break-all">
-            Share link: <a className="text-blue-600 hover:underline" href={shareUrl}>{shareUrl}</a>
+            Share link:{" "}
+            <a className="text-blue-600 hover:underline" href={shareUrl}>
+              {shareUrl}
+            </a>
           </div>
           <img src={qrUrl} alt="QR Code" className="w-20 h-20" />
         </div>

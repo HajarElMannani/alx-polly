@@ -4,20 +4,10 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 import Input from "../../components/shadcn/Input";
 import Button from "../../components/shadcn/Button";
 import { useAuth } from "../../components/AuthProvider";
-import { supabaseBrowser } from "../../lib/supabaseClient";
+import { updatePassword, updateProfile } from "./actions";
 
-/**
- * ProfilePage
- *
- *  Lets authenticated users update profile metadata and change passwords.
- *  Account management screen integrated with Supabase auth/profile tables.
- *  User session provides email; username stored in user metadata.
- *  Verifies old password before updating; shows inline status and error messages.
- *  Calls Supabase auth update APIs and reads from `useAuth()`.
- */
 export default function ProfilePage() {
   const { user } = useAuth();
-  const supabase = supabaseBrowser();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState<string | null>(null);
   const [oldPassword, setOldPassword] = useState("");
@@ -30,41 +20,28 @@ export default function ProfilePage() {
     setEmail(user?.email ?? null);
   }, [user]);
 
-  const updateProfile = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage(null);
     setError(null);
-    const { error } = await supabase!.auth.updateUser({ data: { username } });
-    if (error) setError(error.message);
-    else setMessage("Profile updated successfully.");
+    const formData = new FormData(e.currentTarget);
+    const result = await updateProfile(formData);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setMessage("Profile updated successfully.");
+    }
   };
 
-  const updatePassword = async (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage(null);
     setError(null);
-    if (!email) {
-      setError("Missing email in session.");
-      return;
-    }
-    if (oldPassword.length < 6) {
-      setError("Old password is required.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("New password must be at least 6 characters.");
-      return;
-    }
-    // Verify old password by signing in before updating
-    const { error: verifyErr } = await supabase!.auth.signInWithPassword({ email, password: oldPassword });
-    if (verifyErr) {
-      setError("Old password is incorrect.");
-      return;
-    }
-    // Update to new password
-    const { error: updErr } = await supabase!.auth.updateUser({ password });
-    if (updErr) setError(updErr.message);
-    else {
+    const formData = new FormData(e.currentTarget);
+    const result = await updatePassword(formData);
+    if (result.error) {
+      setError(result.error);
+    } else {
       setMessage("Password updated successfully.");
       setOldPassword("");
       setPassword("");
@@ -83,13 +60,13 @@ export default function ProfilePage() {
               <label className="text-sm text-gray-500">Email</label>
               <div className="mt-1">{email}</div>
             </div>
-            <form className="flex flex-col gap-4" onSubmit={updateProfile}>
-              <Input label="Username" value={username} onChange={e => setUsername(e.target.value)} required />
+            <form className="flex flex-col gap-4" onSubmit={handleUpdateProfile}>
+              <Input name="username" label="Username" value={username} onChange={e => setUsername(e.target.value)} required />
               <Button type="submit" className="bg-black text-white self-end">Save Profile</Button>
             </form>
-            <form className="flex flex-col gap-4" onSubmit={updatePassword}>
-              <Input label="Old Password" type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} required />
-              <Input label="New Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            <form className="flex flex-col gap-4" onSubmit={handleUpdatePassword}>
+              <Input name="oldPassword" label="Old Password" type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} required />
+              <Input name="newPassword" label="New Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
               <Button type="submit" className="bg-black text-white self-end">Update Password</Button>
             </form>
           </div>
