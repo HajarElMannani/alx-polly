@@ -13,10 +13,10 @@ type PollRow = {
   author_id: string;
 };
 
-export default async function VotePage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies();
+export default async function VotePage(props: { params: Promise<{ id: string }> }) {
+  const cookieStore = await cookies();
   const supabase = supabaseServer(cookieStore);
-  const pollId = params.id;
+  const { id: pollId } = await props.params;
 
   const { data: poll } = await supabase
     .from("polls")

@@ -5,10 +5,10 @@ type PollRow = { id: string; title: string };
 
 type OptionRow = { id: string; label: string; vote_count: number };
 
-export default async function ResultsPage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies();
+export default async function ResultsPage(props: { params: Promise<{ id: string }> }) {
+  const cookieStore = await cookies();
   const supabase = supabaseServer(cookieStore);
-  const pollId = params.id;
+  const { id: pollId } = await props.params;
 
   const { data: poll } = await supabase
     .from("polls")

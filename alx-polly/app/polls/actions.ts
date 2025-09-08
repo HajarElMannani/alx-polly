@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 export async function deletePoll(pollId: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = supabaseServer(cookieStore);
 
   const {

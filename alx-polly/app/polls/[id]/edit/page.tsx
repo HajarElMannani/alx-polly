@@ -1,5 +1,7 @@
-import { supabaseServer } from "@/lib/supabaseServer";
-import { cookies } from "next/headers";
+"use client";
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { supabaseBrowser } from "@/lib/supabaseClient";
 import EditPollForm from "./EditPollForm";
 
 type PollRow = {
@@ -11,29 +13,79 @@ type PollRow = {
 
 type OptionRow = { id: string; label: string; position: number };
 
-export default async function EditPollPage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies();
-  const supabase = supabaseServer(cookieStore);
-  const pollId = params.id;
+export default function EditPollPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [unauthorized, setUnauthorized] = useState(false);
+  const [poll, setPoll] = useState<PollRow | null>(null);
+  const [options, setOptions] = useState<OptionRow[]>([]);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  useEffect(() => {
+    const run = async () => {
+      const supabase = supabaseBrowser();
+      if (!supabase) {
+        setUnauthorized(true);
+        setLoading(false);
+        return;
+      }
+      const { data: session } = await supabase.auth.getUser();
+      const userId = session.user?.id;
+      const pollId = params.id;
+      const { data: pollRow } = await supabase
+        .from("polls")
+        .select("id,title,description,author_id")
+        .eq("id", pollId)
+        .single();
+      if (!pollRow) {
+        setPoll(null);
+        setLoading(false);
+        return;
+      }
+      if (!userId || pollRow.author_id !== userId) {
+        setUnauthorized(true);
+        setLoading(false);
+        return;
+      }
+      const { data: opts } = await supabase
+        .from("poll_options")
+        .select("id,label,position")
+        .eq("poll_id", pollId)
+        .order("position", { ascending: true });
+      setPoll(pollRow as PollRow);
+      setOptions((opts as OptionRow[]) || []);
+      setLoading(false);
+    };
+    run();
+  }, [params.id]);
 
-  const { data: poll } = await supabase
-    .from("polls")
-    .select("id,title,description,author_id")
-    .eq("id", pollId)
-    .single();
+  if (loading) {
+    return (
+      <main className="min-h-screen py-10 px-4">
+        <div className="w-full max-w-xl mx-auto text-center">Loading...</div>
+      </main>
+    );
+  }
+
+  if (unauthorized) {
+    return (
+      <main className="min-h-screen py-10 px-4">
+        <div className="w-full max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold">Unauthorized</h1>
+          <p className="text-gray-600 mt-2">You are not authorized to edit this poll.</p>
+          <a href={`/polls/${params.id}`} className="text-blue-600 hover:underline mt-4 inline-block">
+            Back to Poll
+          </a>
+        </div>
+      </main>
+    );
+  }
 
   if (!poll) {
     return (
       <main className="min-h-screen py-10 px-4">
         <div className="w-full max-w-xl mx-auto text-center">
           <h1 className="text-2xl font-bold">Poll not found</h1>
-          <p className="text-gray-600 mt-2">
-            The poll you are looking for does not exist or has been deleted.
-          </p>
           <a href="/polls" className="text-blue-600 hover:underline mt-4 inline-block">
             Back to Polls
           </a>
@@ -42,27 +94,5 @@ export default async function EditPollPage({ params }: { params: { id: string } 
     );
   }
 
-  if (poll.author_id !== user?.id) {
-    return (
-      <main className="min-h-screen py-10 px-4">
-        <div className="w-full max-w-xl mx-auto text-center">
-          <h1 className="text-2xl font-bold">Unauthorized</h1>
-          <p className="text-gray-600 mt-2">
-            You are not authorized to edit this poll.
-          </p>
-          <a href={`/polls/${poll.id}`} className="text-blue-600 hover:underline mt-4 inline-block">
-            Back to Poll
-          </a>
-        </div>
-      </main>
-    );
-  }
-
-  const { data: options } = await supabase
-    .from("poll_options")
-    .select("id,label,position")
-    .eq("poll_id", pollId)
-    .order("position", { ascending: true });
-
-  return <EditPollForm poll={poll as PollRow} options={options as OptionRow[]} />;
+  return <EditPollForm poll={poll} options={options} />;
 }

@@ -12,7 +12,7 @@ type PollRow = {
 };
 
 export default async function ExplorePage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = supabaseServer(cookieStore);
 
   const { data: polls, error } = await supabase
