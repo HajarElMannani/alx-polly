@@ -71,7 +71,7 @@ export default function EditPollForm({ poll, options: initialOptions }: { poll: 
             <Button type="button" variant="ghost" className="mt-2 w-fit" onClick={addOption}>+ Add option</Button>
           </div>
           <div className="flex justify-end gap-2">
-            <a href={`/polls/${poll.id}`} className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm">Cancel</a>
+            <a href="/polls" className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm">Cancel</a>
             <Button type="submit" className="bg-black text-white" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
           </div>
         </form>
