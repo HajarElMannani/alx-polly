@@ -51,7 +51,7 @@ export default function CreatePollPage() {
     if (result.error) {
       alert(result.error);
     } else {
-      router.push(`/polls/${result.pollId}`);
+      router.push("/polls");
     }
   };
 
