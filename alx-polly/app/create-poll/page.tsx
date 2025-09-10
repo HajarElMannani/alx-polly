@@ -1,26 +1,23 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useActionState } from "react";
 import Input from "../../components/shadcn/Input";
 import Button from "../../components/shadcn/Button";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { supabaseBrowser } from "../../lib/supabaseClient";
 import { createPoll } from "./actions";
+import { SubmitButton } from "./SubmitButton";
 
-/**
- * CreatePollPage
- *
- *  Multi-tab form for authors to create a new poll with options and settings.
- * Context: Guides through basic info and advanced settings to produce consistent rows.
- *  Authenticated user exists; Supabase schema for polls/options is available.
- *  Validates minimum options; prevents submission without title; disables while submitting.
- *  Writes poll and its options; routes to the new poll page after creation.
- */
+const initialState = {
+  error: "",
+  pollId: null,
+};
+
 export default function CreatePollPage() {
   const router = useRouter();
+  const [state, formAction] = useActionState(createPoll, initialState);
   const [activeTab, setActiveTab] = useState("basic");
   const [options, setOptions] = useState(["", ""]);
-  const [submitting, setSubmitting] = useState(false);
 
   const handleOptionChange = (idx: number, value: string) => {
     setOptions((opts) => opts.map((opt, i) => (i === idx ? value : opt)));
@@ -30,30 +27,14 @@ export default function CreatePollPage() {
     setOptions((opts) => [...opts, ""]);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const formData = new FormData(e.currentTarget);
-    // Attach access token for server action if cookies are unavailable
-    try {
-      const supabase = supabaseBrowser();
-      const { data } = (await supabase?.auth.getSession()) ?? { data: undefined };
-      const token = data?.session?.access_token;
-      if (token) {
-        formData.set("accessToken", token);
-      }
-    } catch {}
-    options.forEach((option) => {
-      formData.append("options[]", option);
-    });
-    const result = await createPoll(formData);
-    setSubmitting(false);
-    if (result.error) {
-      alert(result.error);
-    } else {
-      router.push("/polls");
+  useEffect(() => {
+    if (state.error) {
+      alert(state.error);
     }
-  };
+    if (state.pollId) {
+      router.push(`/polls/${state.pollId}`);
+    }
+  }, [state, router]);
 
   return (
     <ProtectedRoute>
@@ -76,7 +57,7 @@ export default function CreatePollPage() {
             </button>
           </div>
           {/* Form wrapping all tab contents with a persistent footer button */}
-          <form className="flex-1 flex flex-col" onSubmit={handleSubmit}>
+          <form className="flex-1 flex flex-col" action={formAction}>
             <div className="flex-1">
               {activeTab === "basic" && (
                 <div>
@@ -92,6 +73,7 @@ export default function CreatePollPage() {
                           <Input
                             key={idx}
                             placeholder={`Option ${idx + 1}`}
+                            name="options[]"
                             value={opt}
                             onChange={e => handleOptionChange(idx, e.target.value)}
                             required={idx < 2}
@@ -147,9 +129,7 @@ export default function CreatePollPage() {
                 </div>
               )}
             </div>
-            <Button type="submit" className="mt-3 self-end bg-black text-white" disabled={submitting}>
-              {submitting ? "Creating..." : "Create Poll"}
-            </Button>
+            <SubmitButton />
           </form>
         </div>
       </main>

@@ -4,17 +4,15 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
-export async function createPoll(formData: FormData) {
+export async function createPoll(prevState: any, formData: FormData) {
   const cookieStore = await cookies();
-  // Allow bearer token override (for environments where HttpOnly cookies are unavailable)
-  const accessToken = (formData.get("accessToken") as string) || undefined;
-  const supabase = supabaseServer(cookieStore, accessToken);
+  const supabase = supabaseServer(cookieStore);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return { error: "You must be logged in to create a poll." };
+    return { error: "You must be logged in to create a poll.", pollId: null };
   }
 
   const title = formData.get("title") as string;
@@ -28,7 +26,7 @@ export async function createPoll(formData: FormData) {
   const trimmedOptions = options.map((o) => o.trim()).filter(Boolean);
 
   if (!title.trim() || trimmedOptions.length < 2) {
-    return { error: "Please enter a title and at least two options." };
+    return { error: "Please enter a title and at least two options.", pollId: null };
   }
 
   try {
@@ -65,8 +63,8 @@ export async function createPoll(formData: FormData) {
     }
 
     revalidatePath("/polls");
-    return { pollId: pollRow.id };
+    return { error: "", pollId: pollRow.id };
   } catch (err: any) {
-    return { error: err?.message || "Something went wrong while creating the poll" };
+    return { error: err?.message || "Something went wrong while creating the poll", pollId: null };
   }
 }
