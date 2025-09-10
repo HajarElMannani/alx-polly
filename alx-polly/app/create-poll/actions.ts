@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 export async function createPoll(formData: FormData) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   // Allow bearer token override (for environments where HttpOnly cookies are unavailable)
   const accessToken = (formData.get("accessToken") as string) || undefined;
   const supabase = supabaseServer(cookieStore, accessToken);
