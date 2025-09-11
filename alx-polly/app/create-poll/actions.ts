@@ -6,7 +6,8 @@ import { cookies } from "next/headers";
 
 export async function createPoll(prevState: any, formData: FormData) {
   const cookieStore = await cookies();
-  const supabase = supabaseServer(cookieStore);
+  const accessToken = typeof formData.get("accessToken") === "string" ? (formData.get("accessToken") as string) : undefined;
+  const supabase = supabaseServer(cookieStore, accessToken);
 
   const {
     data: { user },
@@ -63,6 +64,7 @@ export async function createPoll(prevState: any, formData: FormData) {
     }
 
     revalidatePath("/polls");
+    revalidatePath("/explore");
     return { error: "", pollId: pollRow.id };
   } catch (err: any) {
     return { error: err?.message || "Something went wrong while creating the poll", pollId: null };

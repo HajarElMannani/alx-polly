@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { createPoll } from "./actions";
 import { SubmitButton } from "./SubmitButton";
+import { supabaseBrowser } from "../../lib/supabaseClient";
 
 const initialState = {
   error: "",
@@ -18,6 +19,18 @@ export default function CreatePollPage() {
   const [state, formAction] = useActionState(createPoll, initialState);
   const [activeTab, setActiveTab] = useState("basic");
   const [options, setOptions] = useState(["", ""]);
+  const [accessToken, setAccessToken] = useState<string>("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = supabaseBrowser();
+        const { data } = (await supabase?.auth.getSession()) ?? { data: undefined };
+        const token = data?.session?.access_token;
+        if (token) setAccessToken(token);
+      } catch {}
+    })();
+  }, []);
 
   const handleOptionChange = (idx: number, value: string) => {
     setOptions((opts) => opts.map((opt, i) => (i === idx ? value : opt)));
@@ -58,76 +71,73 @@ export default function CreatePollPage() {
           </div>
           {/* Form wrapping all tab contents with a persistent footer button */}
           <form className="flex-1 flex flex-col" action={formAction}>
+            <input type="hidden" name="accessToken" value={accessToken} />
             <div className="flex-1">
-              {activeTab === "basic" && (
-                <div>
-                  <h2 className="text-xl font-semibold mb-1">Poll Information</h2>
-                  <p className="text-gray-500 mb-6">Enter the details of your new poll.</p>
-                  <div className="flex flex-col gap-4">
-                    <Input label="Poll Title" placeholder="Enter poll title" name="title" required />
-                    <Input label="Description (optional)" placeholder="Enter description" name="description" />
-                    <div>
-                      <label className="text-sm font-medium">Poll Options</label>
-                      <div className="flex flex-col gap-2 mt-2">
-                        {options.map((opt, idx) => (
-                          <Input
-                            key={idx}
-                            placeholder={`Option ${idx + 1}`}
-                            name="options[]"
-                            value={opt}
-                            onChange={e => handleOptionChange(idx, e.target.value)}
-                            required={idx < 2}
-                          />
-                        ))}
-                      </div>
-                      <Button type="button" variant="ghost" className="mt-2 w-fit" onClick={addOptionField}>
-                        + Add option
-                      </Button>
+              <div hidden={activeTab !== "basic"}>
+                <h2 className="text-xl font-semibold mb-1">Poll Information</h2>
+                <p className="text-gray-500 mb-6">Enter the details of your new poll.</p>
+                <div className="flex flex-col gap-4">
+                  <Input label="Poll Title" placeholder="Enter poll title" name="title" required />
+                  <Input label="Description (optional)" placeholder="Enter description" name="description" />
+                  <div>
+                    <label className="text-sm font-medium">Poll Options</label>
+                    <div className="flex flex-col gap-2 mt-2">
+                      {options.map((opt, idx) => (
+                        <Input
+                          key={idx}
+                          placeholder={`Option ${idx + 1}`}
+                          name="options[]"
+                          value={opt}
+                          onChange={e => handleOptionChange(idx, e.target.value)}
+                          required={idx < 2}
+                        />
+                      ))}
                     </div>
+                    <Button type="button" variant="ghost" className="mt-2 w-fit" onClick={addOptionField}>
+                      + Add option
+                    </Button>
                   </div>
                 </div>
-              )}
-              {activeTab === "settings" && (
-                <div>
-                  <h2 className="text-xl font-semibold mb-1">Poll Settings</h2>
-                  <p className="text-gray-500 mb-6">Configure additional options for your poll.</p>
-                  <div className="flex flex-col gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        name="allowMultiple"
-                        value="true"
-                      />
-                      <span>Allow users to select multiple options</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        name="requireLogin"
-                        value="true"
-                      />
-                      <span>Require users to be logged in to vote</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        name="isPublic"
-                        value="true"
-                        defaultChecked
-                      />
-                      <span>List this poll on Explore (public)</span>
-                    </label>
-                    <Input
-                      label="Poll End Date (optional)"
-                      type="datetime-local"
-                      name="endDate"
+              </div>
+              <div hidden={activeTab !== "settings"}>
+                <h2 className="text-xl font-semibold mb-1">Poll Settings</h2>
+                <p className="text-gray-500 mb-6">Configure additional options for your poll.</p>
+                <div className="flex flex-col gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      name="allowMultiple"
+                      value="true"
                     />
-                  </div>
+                    <span>Allow users to select multiple options</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      name="requireLogin"
+                      value="true"
+                    />
+                    <span>Require users to be logged in to vote</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      name="isPublic"
+                      value="true"
+                      defaultChecked
+                    />
+                    <span>List this poll on Explore (public)</span>
+                  </label>
+                  <Input
+                    label="Poll End Date (optional)"
+                    type="datetime-local"
+                    name="endDate"
+                  />
                 </div>
-              )}
+              </div>
             </div>
             <SubmitButton />
           </form>
