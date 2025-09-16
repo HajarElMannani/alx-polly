@@ -1,7 +1,8 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { cookies } from "next/headers";
+import ExportButton from "./ExportButton";
 
-type PollRow = { id: string; title: string };
+type PollRow = { id: string; title: string; author_id: string };
 
 type OptionRow = { id: string; label: string; vote_count: number };
 
@@ -12,7 +13,7 @@ export default async function ResultsPage(props: { params: Promise<{ id: string 
 
   const { data: poll } = await supabase
     .from("polls")
-    .select("id,title")
+    .select("id,title,author_id")
     .eq("id", pollId)
     .single();
 
@@ -46,6 +47,10 @@ export default async function ResultsPage(props: { params: Promise<{ id: string 
 
   const totalVotes = options.reduce((acc, o) => acc + o.vote_count, 0);
 
+  const { data: me } = await supabase.auth.getUser();
+  const meId = me?.user?.id ?? null;
+  const isAuthor = Boolean(meId && meId === (poll as any).author_id);
+
   const shareUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/polls/${poll.id}` : `http://localhost:3000/polls/${poll.id}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
 
@@ -54,6 +59,10 @@ export default async function ResultsPage(props: { params: Promise<{ id: string 
       <div className="w-full max-w-xl mx-auto bg-white rounded-lg shadow p-8">
         <h1 className="text-2xl font-bold">Results: {poll.title}</h1>
         <div className="mt-4 text-sm text-gray-600">Total votes: {totalVotes}</div>
+        <div className="mt-4 flex gap-2">
+          <ExportButton pollId={poll.id} mode="tallies" />
+          {isAuthor ? <ExportButton pollId={poll.id} mode="raw" /> : null}
+        </div>
         <div className="mt-6 space-y-3">
           {options.map((opt) => (
             <div key={opt.id}>
