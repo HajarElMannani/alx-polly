@@ -1,0 +1,43 @@
+---
+description: Export-to-CSV feature: security-first route, robust CSV formatting, streaming for scale, clean UX, and safe filenames.
+globs:
+  - "lib/export/csv.ts"
+  - "app/polls/**/export.csv/route.ts"
+  - "app/polls/**/results/ExportButton.tsx"
+  - "lib/__tests__/csv.test.ts"
+  - "lib/results.ts"
+alwaysApply: false
+---
+
+@lib/export/csv.ts
+@app/polls/[id]/export.csv/route.ts
+@app/polls/[id]/results/ExportButton.tsx
+@lib/__tests__/csv.test.ts
+@lib/results.ts
+
+# 1) Security-first export policy
+- **Authorize**: Public polls may export **tallies**; **raw votes** are author-only. Validate via server-side session (Supabase) inside the route. Do **not** gate on client state.
+- **RLS alignment**: Queries in the route must respect Supabase **RLS**; never bypass with service keys. Add tests/notes if RLS changes are required.
+- **PII minimization**: Default to **tallies**. Only include `voterId`/timestamps when the author explicitly selects “raw votes”. Never include emails/usernames unless strictly required.
+- **URL/transport**: Use the **server route** to deliver the file. Avoid client Blob exports for author-only data. Add basic **rate limiting** on the route to deter scraping.
+
+# 2) CSV invariants (escape, inject, encoding)
+- **Escaping**: RFC4180 style—wrap fields containing `, " \r \n` in quotes and double any quotes.
+- **CSV injection**: If a field starts with `=`, `+`, `-`, or `@`, prefix with a single quote **before** encoding.
+- **Encoding/compat**: Prefer UTF-8 with **BOM** and **CRLF** when not streaming (best for Excel). Keep headers stable; return header-only CSV when there are zero rows.
+
+# 3) Route behavior & headers
+- **Content-Type**: `text/csv; charset=utf-8` (omit charset if streaming without BOM).
+- **Content-Disposition**: `attachment; filename="poll-${slug}-${mode}-${yyyyMMdd}.csv"`; **slugify/validate** to avoid header injection.
+- **Caching**: Tallies (open polls): `Cache-Control: max-age=15, s-maxage=15, stale-while-revalidate=60`. Author-only raw: `no-store`.
+- **Failure modes**: Return 200 with header-only CSV for empty results; use 401/403 for unauthorized; 429 when rate-limited.
+
+# 4) Performance & data fetching
+- **Streaming**: For large exports, **stream** rows (ReadableStream) from the route; do not build one giant string in memory.
+- **Query efficiency**: Compute **tallies in SQL** (`GROUP BY option_id, COUNT(*)`) to reduce transfer. Add indexes on `votes(poll_id)` and `votes(option_id)` if raw-fetch is frequent.
+- **Modes**: Small datasets may use client-side Blob in `ExportButton.tsx`; **prefer the route** for auth, auditability, and large exports.
+
+# 5) Client UX contract
+- **Tallies**: Simple **GET** link with `download` attribute; show filename pattern above.
+- **Raw votes**: Use normal navigation (cookie/session flow) or fetch→stream→Blob URL; show progress/spinner and clear error states.
+- **Tests**: Unit tests in `lib/__tests__/csv.test.ts` must cover escaping, CSV injection prefixes, BOM/line endings (when non-streaming), and zero-row behavior.
